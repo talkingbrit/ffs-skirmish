@@ -1,8 +1,28 @@
 {
   "event": "FFS Skirmish Series — Event 1",
-  "teams": [],
+  "teams": [
+    {
+      "name": "Tea Slurpers",
+      "p1": {
+        "name": "Brit",
+        "riot": "Brit#2089",
+        "rank": "Ascendant 1",
+        "kd": "1.21",
+        "wr": "40.0",
+        "hs": "26.8"
+      },
+      "p2": {
+        "name": "Teebot",
+        "riot": "Tharyn#washd",
+        "rank": "Immortal 2",
+        "kd": "1.66",
+        "wr": "40.0",
+        "hs": "34.0"
+      }
+    }
+  ],
   "bracket": null,
   "log": [],
   "placements": {},
-  "updatedAt": 1783759364963
+  "updatedAt": 1783759420029
 }
