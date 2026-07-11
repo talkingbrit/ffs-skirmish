@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="FFS Skirmish Series — live brackets, seeding and season leaderboards for the FFS 2v2 Valorant circuit.">
-<title>FFS Skirmish Series</title>
+<meta name="description" content="FFS Series — live brackets, seeding and season leaderboards for the FFS community Valorant circuit.">
+<title>FFS Series</title>
 <style>
 :root{
   --bg:#0d1117; --surface:#141a22; --surface2:#1b2330; --line:#232d3b; --line2:#2d3947;
@@ -20,7 +20,6 @@ a:hover{text-decoration:underline}
 /* header */
 .topbar{position:sticky;top:0;z-index:10;background:rgba(13,17,23,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
 .topbar-inner{max-width:1080px;margin:0 auto;padding:0 24px;height:58px;display:flex;align-items:center;gap:14px}
-.mark{width:26px;height:26px;border-radius:6px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#fff;letter-spacing:.5px;flex:none}
 .brand{font-weight:700;font-size:14px;letter-spacing:2.5px;white-space:nowrap}
 .brand em{color:var(--accent);font-style:normal}
 .eventname{margin-left:auto;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -117,15 +116,14 @@ footer .orglink:hover{color:var(--muted);text-decoration:none}
 </head>
 <body>
 <div class="topbar"><div class="topbar-inner">
-  <div class="mark">FS</div>
-  <div class="brand">FFS <em>SKIRMISH</em> SERIES</div>
+  <div class="brand">FFS <em>SERIES</em></div>
   <div class="eventname" id="evtName"></div>
   <div class="adminpill" id="adminPill" style="display:none">Organizer</div>
 </div></div>
 <div class="nav"><div class="nav-inner" id="nav"></div></div>
 <main id="main"></main>
 <footer>
-  FFS Skirmish Series · community Valorant 2v2 circuit · <span id="lastUpd"></span>
+  FFS Series · community Valorant circuit · <span id="lastUpd"></span>
   <span style="margin:0 6px;color:var(--line2)">|</span>
   <span class="orglink" id="orgLink" onclick="toggleAdmin()">Organizer sign-in</span>
 </footer>
@@ -146,7 +144,7 @@ const PLACE_PTS = {1:100, 2:70, 3:50, 4:35, 5:20, 6:20, 7:10, 8:10};
 
 /* Shared community stats key — works for every visitor, no personal key needed. Replace in Settings if it ever gets rate-limited. */
 const DEF_SETTINGS = {region:"eu", apiKey:"HDEV-f0c323e8-93a6-4d93-ada6-5902bf110a64", ghRepo:"talkingbrit/ffs-skirmish", ghToken:""};
-let S = { event:"FFS Skirmish Series — Event 1", teams:[], bracket:null, log:[], placements:{}, settings:{...DEF_SETTINGS} };
+let S = { event:"FFS Series — Event 1", teams:[], bracket:null, log:[], placements:{}, settings:{...DEF_SETTINGS} };
 let admin = false;
 try{ admin = localStorage.getItem("ffsOrganizer")==="1"; }catch(e){}
 function persist(){ try{ S.updatedAt=Date.now(); localStorage.setItem("ffsSkirmishS1", JSON.stringify(S)); }catch(e){} queuePublish(); }
@@ -533,38 +531,74 @@ function viewStandings(){
 }
 function setPlace(team,evt,val){ if(!admin) return; S.placements[team]=S.placements[team]||{}; if(val) S.placements[team][evt]=+val; else delete S.placements[team][evt]; persist(); render(); }
 
-/* ----- match entry (admin) ----- */
+/* ----- match entry (admin) — tied to the bracket ----- */
+let entryMatch=null;
+function readyMatches(){
+  const b=S.bracket; if(!b) return [];
+  return b.matches.map((m,i)=>({i,o:matchOutcome(i)}))
+    .filter(x=>x.o.A&&x.o.B&&x.o.A!=="BYE"&&x.o.B!=="BYE");
+}
+function teamPlayers(name){
+  const t=S.teams.find(t=>t.name===name);
+  return t?[t.p1.name,t.p2.name]:["Player 1","Player 2"];
+}
+function setEntryMatch(v){ entryMatch=+v; render(); }
 function viewEntry(){
-  const players=S.teams.flatMap(t=>[{n:t.p1.name,team:t.name},{n:t.p2.name,team:t.name}]);
   const rows=S.log.slice().reverse().map((e,ri)=>{ const i=S.log.length-1-ri; return `<tr>
     <td>${esc(e.match)}</td><td><b>${esc(e.player)}</b> <span class="sub">${esc(e.team)}</span></td>
     <td class="r">${e.k} / ${e.d} / ${e.a}</td><td class="r">${e.acs}</td>
     <td class="r">${e.won?'<span class="wl-w">Won</span>':'<span class="wl-l">Lost</span>'}</td>
     <td class="r"><button class="btn sm ghost" onclick="S.log.splice(${i},1);persist();render()">Delete</button></td></tr>`; }).join("");
-  return `<div class="sec">${secHead("Log a map","one row per player, per map")}
-    <div class="card">
-    <div class="row">
-    <div class="field"><label>Match</label><input id="lm" placeholder="M5" style="width:80px"></div>
-    <div class="field"><label>Player</label><select id="lp">${players.map(p=>`<option value="${esc(p.n)}|${esc(p.team)}">${esc(p.n)} (${esc(p.team)})</option>`).join("")}</select></div>
-    <div class="field"><label>Kills</label><input class="num" id="lk" type="number" value="0"></div>
-    <div class="field"><label>Deaths</label><input class="num" id="ld" type="number" value="0"></div>
-    <div class="field"><label>Assists</label><input class="num" id="la" type="number" value="0"></div>
-    <div class="field"><label>ACS</label><input class="num" id="lacs" type="number" value="200"></div>
-    <div class="field"><label>Map won?</label><select id="lw"><option value="1">Yes</option><option value="0">No</option></select></div>
-    <button class="btn" onclick="addLog()">Log map</button></div>
-    <div class="hint">Copy kills, deaths, assists and ACS from the tracker.gg match page after each map. Entries feed the public player leaderboard.</div>
-    </div></div>
-    <div class="sec">${secHead("Season match log", S.log.length+" entries")}
+  const logSec=`<div class="sec">${secHead("Season match log", S.log.length+" entries")}
     <div class="card" style="padding:8px 16px 12px">
     <table><thead><tr><th>Match</th><th>Player</th><th class="r">K / D / A</th><th class="r">ACS</th><th class="r">Result</th><th></th></tr></thead>
     <tbody>${rows||`<tr><td colspan="6"><div class="empty"><b>Nothing logged yet</b></div></td></tr>`}</tbody></table></div></div>`;
+
+  const ready=readyMatches();
+  if(!ready.length){
+    return `<div class="sec">${secHead("Log a map")}
+      <div class="card"><div class="empty"><b>No matches available</b>
+      Generate the bracket first — once a match has both teams set, you can log its map here.</div></div></div>`+logSec;
+  }
+  if(entryMatch==null || !ready.some(x=>x.i===entryMatch)) entryMatch=ready[0].i;
+  const o=matchOutcome(entryMatch);
+  const rosters=[...teamPlayers(o.A).map(p=>({p,team:o.A})), ...teamPlayers(o.B).map(p=>({p,team:o.B}))];
+  const statRows=rosters.map((r,idx)=>`<tr>
+    <td><b>${esc(r.p)}</b> <span class="sub">${esc(r.team)}</span></td>
+    <td class="r"><input class="num" id="st${idx}k" type="number" value="0"></td>
+    <td class="r"><input class="num" id="st${idx}d" type="number" value="0"></td>
+    <td class="r"><input class="num" id="st${idx}a" type="number" value="0"></td>
+    <td class="r"><input class="num" id="st${idx}acs" type="number" value="200"></td></tr>`).join("");
+  const defWinner=o.winner&&o.winner!=="BYE"?o.winner:o.A;
+  return `<div class="sec">${secHead("Log a map","stats for every player in one go")}
+    <div class="card">
+    <div class="row">
+    <div class="field"><label>Bracket match</label><select id="em" onchange="setEntryMatch(this.value)">
+      ${ready.map(x=>`<option value="${x.i}" ${x.i===entryMatch?"selected":""}>Match ${x.i+1} — ${esc(x.o.A)} vs ${esc(x.o.B)}</option>`).join("")}</select></div>
+    <div class="field"><label>Map winner</label><select id="mw">
+      <option ${defWinner===o.A?"selected":""}>${esc(o.A)}</option>
+      <option ${defWinner===o.B?"selected":""}>${esc(o.B)}</option></select></div>
+    </div>
+    <table style="max-width:640px"><thead><tr><th>Player</th><th class="r">Kills</th><th class="r">Deaths</th><th class="r">Assists</th><th class="r">ACS</th></tr></thead>
+    <tbody>${statRows}</tbody></table>
+    <div class="row" style="margin:14px 0 0"><button class="btn" onclick="addMapLog()">Log all 4 players</button></div>
+    <div class="hint">Players come straight from the selected bracket match. Copy each player's kills, deaths, assists and ACS from the tracker.gg match page. The winner is pre-filled from the reported score. Entries feed the public player leaderboard.</div>
+    </div></div>`+logSec;
 }
-function addLog(){
-  const g=id=>document.getElementById(id).value;
-  const [player,team]=g("lp").split("|");
-  if(!player) return alert("Add teams first");
-  S.log.push({match:g("lm")||"M?",player,team,k:+g("lk"),d:+g("ld"),a:+g("la"),acs:+g("lacs"),won:g("lw")==="1"});
-  persist(); render();
+function addMapLog(){
+  const o=matchOutcome(entryMatch);
+  const winner=document.getElementById("mw").value;
+  const rosters=[...teamPlayers(o.A).map(p=>({p,team:o.A})), ...teamPlayers(o.B).map(p=>({p,team:o.B}))];
+  const entries=rosters.map((r,idx)=>({
+    match:"M"+(entryMatch+1), player:r.p, team:r.team,
+    k:+document.getElementById(`st${idx}k`).value||0,
+    d:+document.getElementById(`st${idx}d`).value||0,
+    a:+document.getElementById(`st${idx}a`).value||0,
+    acs:+document.getElementById(`st${idx}acs`).value||0,
+    won:r.team===winner
+  }));
+  if(entries.every(e=>!e.k&&!e.d&&!e.a)) return alert("Enter some stats first — everything is zero.");
+  S.log.push(...entries); persist(); render();
 }
 
 /* ----- settings (admin) ----- */
