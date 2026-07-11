@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FFS Skirmish Series — Tournament Hub</title>
+<style>
+:root{--red:#FF4655;--dark:#0F1923;--panel:#1B2733;--panel2:#233241;--txt:#ECE8E1;--dim:#8B978F;--green:#2ECC71;--gold:#F5C542}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--dark);color:var(--txt);font-family:Arial,'Segoe UI',sans-serif;min-height:100vh}
+header{padding:22px 28px 0;border-bottom:2px solid var(--red);background:linear-gradient(180deg,#152230,var(--dark))}
+h1{font-size:22px;letter-spacing:2px;text-transform:uppercase}
+h1 span{color:var(--red)}
+.sub{color:var(--dim);font-size:12px;margin:4px 0 14px}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{background:var(--panel);color:var(--txt);border:none;padding:10px 18px;cursor:pointer;font-size:13px;letter-spacing:1px;text-transform:uppercase;border-radius:4px 4px 0 0}
+nav button.active{background:var(--red);color:#fff;font-weight:bold}
+main{padding:24px 28px;max-width:1200px;margin:0 auto}
+.card{background:var(--panel);border:1px solid #2c3b4a;border-radius:6px;padding:18px;margin-bottom:18px}
+.card h2{font-size:15px;text-transform:uppercase;letter-spacing:1.5px;color:var(--red);margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#0c141d;color:var(--dim);text-transform:uppercase;font-size:11px;letter-spacing:1px;padding:8px;text-align:left}
+td{padding:7px 8px;border-bottom:1px solid #2c3b4a}
+tr:hover td{background:#22303e}
+input,select{background:var(--panel2);border:1px solid #37485a;color:var(--txt);padding:7px 9px;border-radius:4px;font-size:13px}
+input:focus,select:focus{outline:1px solid var(--red)}
+input.num{width:64px}
+button.btn{background:var(--red);color:#fff;border:none;padding:9px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:bold;letter-spacing:.5px}
+button.btn.sec{background:var(--panel2);border:1px solid #37485a}
+button.btn.sm{padding:4px 10px;font-size:12px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:10px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:10px;text-transform:uppercase;color:var(--dim);letter-spacing:1px}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold}
+.pill.seed{background:var(--red);color:#fff}
+.hint{color:var(--dim);font-size:12px;margin:8px 0}
+/* bracket */
+.bwrap{overflow-x:auto;padding-bottom:10px}
+.bracket{display:flex;gap:34px;align-items:stretch}
+.round{display:flex;flex-direction:column;justify-content:space-around;gap:16px;min-width:190px}
+.rtitle{text-align:center;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+.match{background:var(--panel2);border:1px solid #37485a;border-radius:5px;overflow:hidden;cursor:pointer}
+.match:hover{border-color:var(--red)}
+.slot{display:flex;justify-content:space-between;padding:7px 10px;font-size:13px;gap:8px}
+.slot+.slot{border-top:1px solid #37485a}
+.slot .score{color:var(--dim);font-weight:bold;min-width:18px;text-align:right}
+.slot.win{background:#20362a}.slot.win .name{color:var(--green);font-weight:bold}.slot.win .score{color:var(--green)}
+.slot .name.tbd{color:#556}
+.mid{font-size:10px;color:var(--dim);padding:2px 10px;background:#0c141d;letter-spacing:1px}
+.champ{border:2px solid var(--gold)}
+.gold{color:var(--gold);font-weight:bold}
+.top3 td{font-weight:bold}
+dialog{background:var(--panel);color:var(--txt);border:1px solid var(--red);border-radius:6px;padding:22px;max-width:380px}
+dialog::backdrop{background:rgba(0,0,0,.7)}
+.footerbar{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap}
+.tag{font-size:11px;color:var(--dim)}
+@media(max-width:700px){main,header{padding:14px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>FFS <span>SKIRMISH</span> SERIES</h1>
+  <div class="sub" id="evtSub">2v2 Tournament Hub — registration • seeding • bracket • leaderboards</div>
+  <nav id="nav"></nav>
+</header>
+<main id="main"></main>
+
+<dialog id="scoreDlg">
+  <h2 style="color:var(--red);font-size:14px;text-transform:uppercase;margin-bottom:12px" id="dlgTitle">Report score</h2>
+  <div class="row"><div class="field"><label id="dlgA">Team A</label><input class="num" id="scoreA" type="number" min="0"></div>
+  <div class="field"><label id="dlgB">Team B</label><input class="num" id="scoreB" type="number" min="0"></div></div>
+  <div class="footerbar"><button class="btn" onclick="saveScore()">Save</button>
+  <button class="btn sec" onclick="clearScore()">Clear result</button>
+  <button class="btn sec" onclick="document.getElementById('scoreDlg').close()">Cancel</button></div>
+</dialog>
+
+<script>
+"use strict";
+const RANKS = (() => { const out = []; ["Iron","Bronze","Silver","Gold","Platinum","Diamond","Ascendant","Immortal"].forEach(t => [1,2,3].forEach(d => out.push(t+" "+d))); out.push("Radiant"); return out; })();
+const PLACE_PTS = {1:100, 2:70, 3:50, 4:35, 5:20, 6:20, 7:10, 8:10};
+
+let S = { event:"FFS Skirmish Series — Event 1", teams:[], bracket:null, log:[], placements:{}, settings:{region:"eu", apiKey:""} };
+function persist(){ try{ localStorage.setItem("ffsSkirmishS1", JSON.stringify(S)); }catch(e){} }
+function restore(){ try{ const d = localStorage.getItem("ffsSkirmishS1"); if(d) S = Object.assign(S, JSON.parse(d)); S.settings = S.settings||{region:"eu",apiKey:""}; }catch(e){} }
+restore();
+/* On GitHub Pages: auto-load published data.json for visitors with no local data */
+(async()=>{ try{
+  const r=await fetch("data.json",{cache:"no-store"});
+  if(r.ok){ const d=await r.json();
+    if(!S.teams.length&&!S.log.length){ const keep=S.settings; S=d; S.settings=(d.settings&&d.settings.apiKey)?d.settings:keep; render(); } }
+}catch(e){} })();
+
+/* ---------- seeding ---------- */
+function pScore(p){
+  const rank = (RANKS.indexOf(p.rank)+1)/25*100*0.5;
+  const kd = Math.min(+p.kd||0,2)/2*100*0.25;
+  const wr = (+p.wr||0)*0.15;
+  const hs = Math.min(+p.hs||0,40)/40*100*0.10;
+  return rank+kd+wr+hs;
+}
+function tScore(t){ return (pScore(t.p1)+pScore(t.p2))/2; }
+function seededTeams(){ return [...S.teams].sort((a,b)=>tScore(b)-tScore(a)); }
+
+/* ---------- bracket structures ---------- */
+const SE_SEEDS = {4:[1,4,2,3], 8:[1,8,4,5,2,7,3,6], 16:[1,16,8,9,5,12,4,13,3,14,6,11,7,10,2,15]};
+// DE templates: matches with team sources: ["seed",n] | ["w",matchIdx] | ["l",matchIdx]
+function deTemplate(n){
+  if(n===4) return {rounds:[["WB Semis",[0,1]],["WB Final",[2]],["LB Round 1",[3]],["LB Final",[4]],["Grand Final",[5]]],
+    matches:[
+      {a:["seed",1],b:["seed",4],r:"WB Semi 1"},{a:["seed",2],b:["seed",3],r:"WB Semi 2"},
+      {a:["w",0],b:["w",1],r:"WB Final"},
+      {a:["l",0],b:["l",1],r:"LB Round 1"},
+      {a:["w",3],b:["l",2],r:"LB Final"},
+      {a:["w",2],b:["w",4],r:"Grand Final"}]};
+  return {rounds:[["WB Round 1",[0,1,2,3]],["WB Semis",[4,5]],["WB Final",[6]],["LB Round 1",[7,8]],["LB Round 2",[9,10]],["LB Semi",[11]],["LB Final",[12]],["Grand Final",[13]]],
+    matches:[
+      {a:["seed",1],b:["seed",8],r:"WB R1"},{a:["seed",4],b:["seed",5],r:"WB R1"},
+      {a:["seed",2],b:["seed",7],r:"WB R1"},{a:["seed",3],b:["seed",6],r:"WB R1"},
+      {a:["w",0],b:["w",1],r:"WB Semi"},{a:["w",2],b:["w",3],r:"WB Semi"},
+      {a:["w",4],b:["w",5],r:"WB Final"},
+      {a:["l",0],b:["l",1],r:"LB R1"},{a:["l",2],b:["l",3],r:"LB R1"},
+      {a:["w",7],b:["l",5],r:"LB R2"},{a:["w",8],b:["l",4],r:"LB R2"},
+      {a:["w",9],b:["w",10],r:"LB Semi"},
+      {a:["w",11],b:["l",6],r:"LB Final"},
+      {a:["w",6],b:["w",12],r:"GRAND FINAL"}]};
+}
+function seTemplate(n){
+  const rounds=[]; const matches=[]; let prevStart=0;
+  const names={16:["Round of 16","Quarterfinals","Semifinals","Final"],8:["Quarterfinals","Semifinals","Final"],4:["Semifinals","Final"]}[n];
+  const seeds=SE_SEEDS[n];
+  for(let i=0;i<n/2;i++) matches.push({a:["seed",seeds[2*i]],b:["seed",seeds[2*i+1]],r:names[0]});
+  rounds.push([names[0],matches.map((_,i)=>i)]);
+  let size=n/2, ri=1;
+  while(size>1){
+    const start=matches.length, idxs=[];
+    for(let i=0;i<size/2;i++){ matches.push({a:["w",prevStart+2*i],b:["w",prevStart+2*i+1],r:names[ri]}); idxs.push(start+i); }
+    rounds.push([names[ri],idxs]); prevStart=start; size/=2; ri++;
+  }
+  return {rounds,matches};
+}
+function genBracket(type){
+  const teams = seededTeams();
+  if(teams.length<3){ alert("Add at least 3 teams first."); return; }
+  if(teams.length>16){ alert("Max 16 teams."); return; }
+  let size = teams.length<=4?4:teams.length<=8?8:16;
+  if(type==="de" && size===16){ alert("Double elim supports up to 8 teams — using single elim for 16."); type="se"; }
+  const slots = teams.map(t=>t.name); while(slots.length<size) slots.push("BYE");
+  const tpl = type==="de"?deTemplate(size):seTemplate(size);
+  S.bracket = { type, size, slots, results:{}, matches:tpl.matches, rounds:tpl.rounds };
+  persist(); render();
+}
+function resolveSlot(src){
+  const b=S.bracket;
+  if(src[0]==="seed") return b.slots[src[1]-1] ?? "BYE";
+  const m=src[1], res=matchOutcome(m);
+  return src[0]==="w" ? res.winner : res.loser;
+}
+function matchOutcome(i){
+  const b=S.bracket, m=b.matches[i];
+  const A=resolveSlot(m.a), B=resolveSlot(m.b);
+  if(A==null||B==null) return {A,B,winner:null,loser:null};
+  if(A==="BYE"&&B==="BYE") return {A,B,winner:"BYE",loser:"BYE"};
+  if(A==="BYE") return {A,B,winner:B,loser:"BYE"};
+  if(B==="BYE") return {A,B,winner:A,loser:"BYE"};
+  const r=b.results[i];
+  if(r&&r.a!==r.b) return {A,B,winner:r.a>r.b?A:B,loser:r.a>r.b?B:A};
+  return {A,B,winner:null,loser:null};
+}
+function finalPlacements(){
+  const b=S.bracket; if(!b) return [];
+  const out=[]; const push=(p,t)=>{ if(t&&t!=="BYE") out.push([p,t]); };
+  const last=b.matches.length-1;
+  if(b.type==="se"){
+    const f=matchOutcome(last); push("1st",f.winner); push("2nd",f.loser);
+  } else {
+    const gf=matchOutcome(last); push("1st",gf.winner); push("2nd",gf.loser);
+    const lf=matchOutcome(last-1); push("3rd",lf.loser);
+    if(b.size===8){ push("4th",matchOutcome(11).loser); push("5th-6th",matchOutcome(9).loser); push("5th-6th",matchOutcome(10).loser); }
+    else push("4th",matchOutcome(3).loser);
+  }
+  return out;
+}
+/* team W/L from bracket (excluding byes) */
+function teamRecord(name){
+  let w=0,l=0; const b=S.bracket;
+  if(b) b.matches.forEach((m,i)=>{ const o=matchOutcome(i);
+    if(o.winner&&o.winner!=="BYE"&&o.loser!=="BYE"){ if(o.winner===name)w++; if(o.loser===name)l++; } });
+  return {w,l};
+}
+
+/* ---------- match log / player stats ---------- */
+function playerAgg(){
+  const agg={};
+  S.log.forEach(e=>{
+    const k=e.player; agg[k]=agg[k]||{team:e.team,maps:0,k:0,d:0,a:0,acs:0,w:0};
+    const p=agg[k]; p.maps++; p.k+=+e.k; p.d+=+e.d; p.a+=+e.a; p.acs+=+e.acs; p.w+=e.won?1:0; p.team=e.team;
+  });
+  return Object.entries(agg).map(([name,p])=>{
+    const kd=p.k/Math.max(p.d,1), kda=(p.k+p.a/2)/Math.max(p.d,1), avg=p.acs/p.maps;
+    return {name,...p,kd,kda,avg,wr:p.w/p.maps*100,rating:avg/200*50+Math.min(kda,3)/3*50};
+  }).sort((a,b)=>b.rating-a.rating);
+}
+
+/* ---------- UI ---------- */
+const TABS=["Teams & Seeding","Bracket","Match Log","Player Leaderboard","Team Leaderboard","Data"];
+let tab = 0;
+function nav(){ document.getElementById("nav").innerHTML =
+  TABS.map((t,i)=>`<button class="${i===tab?'active':''}" onclick="tab=${i};render()">${t}</button>`).join(""); }
+function esc(s){ return String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function trackerLink(riot){ if(!riot) return ""; const u="https://tracker.gg/valorant/profile/riot/"+encodeURIComponent(riot)+"/overview"; return `<a href="${u}" target="_blank" style="color:#7fb3d5">tracker</a>`; }
+
+function render(){
+  nav();
+  document.getElementById("evtSub").textContent = S.event+" — registration • seeding • bracket • leaderboards";
+  const m=document.getElementById("main");
+  if(tab===0) m.innerHTML=viewTeams();
+  if(tab===1) m.innerHTML=viewBracket();
+  if(tab===2) m.innerHTML=viewLog();
+  if(tab===3) m.innerHTML=viewPlayers();
+  if(tab===4) m.innerHTML=viewTeamLB();
+  if(tab===5) m.innerHTML=viewData();
+}
+
+function pFields(n){
+  return `<div class="field"><label>P${n} name</label><input id="p${n}n" placeholder="Player ${n}"></div>
+  <div class="field"><label>P${n} Riot ID</label><input id="p${n}r" placeholder="Name#Tag"></div>
+  <div class="field"><label>&nbsp;</label><button class="btn sm" id="p${n}fetch" onclick="fetchStats(${n})" title="Pull rank/KD/WR/HS from match history">⟳ Pull stats</button></div>
+  <div class="field"><label>P${n} rank</label><select id="p${n}rank">${RANKS.map(r=>`<option>${r}</option>`).join("")}</select></div>
+  <div class="field"><label>P${n} K/D</label><input class="num" id="p${n}kd" type="number" step="0.01" value="1.00"></div>
+  <div class="field"><label>P${n} Win%</label><input class="num" id="p${n}wr" type="number" step="0.1" value="50"></div>
+  <div class="field"><label>P${n} HS%</label><input class="num" id="p${n}hs" type="number" step="0.1" value="20"></div>`;
+}
+/* ---------- HenrikDev API stat pull ---------- */
+async function apiGet(path){
+  const s=S.settings||{};
+  if(!s.apiKey) throw new Error("Set your HenrikDev API key in the Data tab first (free — api.henrikdev.xyz/dashboard, join their Discord to generate).");
+  const r=await fetch("https://api.henrikdev.xyz"+path+(path.includes("?")?"&":"?")+"api_key="+encodeURIComponent(s.apiKey));
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error("API error "+r.status+(j.errors?" — "+(j.errors[0]&&(j.errors[0].message||j.errors[0].details)||JSON.stringify(j.errors)):""));
+  return j.data;
+}
+async function pullPlayer(riot){
+  const i=riot.lastIndexOf("#");
+  if(i<1) throw new Error("Riot ID must be Name#Tag");
+  const name=encodeURIComponent(riot.slice(0,i)), tag=encodeURIComponent(riot.slice(i+1));
+  const reg=(S.settings&&S.settings.region)||"eu";
+  const mmr=await apiGet(`/valorant/v2/mmr/${reg}/${name}/${tag}`);
+  const rank=(mmr&&mmr.current_data&&mmr.current_data.currenttierpatched)||"";
+  const ms=await apiGet(`/valorant/v3/matches/${reg}/${name}/${tag}?filter=competitive&size=10`);
+  let k=0,d=0,h=0,b=0,l=0,w=0,n=0;
+  (ms||[]).forEach(m=>{
+    const ps=(m.players&&(m.players.all_players||[]))||[];
+    const me=ps.find(p=>(p.name+"#"+p.tag).toLowerCase()===riot.toLowerCase());
+    if(!me||!me.stats) return;
+    k+=me.stats.kills||0; d+=me.stats.deaths||0;
+    h+=me.stats.headshots||0; b+=me.stats.bodyshots||0; l+=me.stats.legshots||0;
+    const team=(me.team||"").toLowerCase();
+    if(m.teams&&m.teams[team]&&m.teams[team].has_won) w++;
+    n++;
+  });
+  if(!n&&!rank) throw new Error("No competitive data found — is the match history public?");
+  return { rank, kd:n?k/Math.max(d,1):null, wr:n?w/n*100:null, hs:(h+b+l)?h/(h+b+l)*100:null, maps:n };
+}
+async function fetchStats(n){
+  const btn=document.getElementById(`p${n}fetch`);
+  const riot=document.getElementById(`p${n}r`).value.trim();
+  if(!riot) return alert("Enter the Riot ID (Name#Tag) first");
+  btn.textContent="…"; btn.disabled=true;
+  try{
+    const st=await pullPlayer(riot);
+    if(st.rank&&RANKS.includes(st.rank)) document.getElementById(`p${n}rank`).value=st.rank;
+    if(st.kd!=null) document.getElementById(`p${n}kd`).value=st.kd.toFixed(2);
+    if(st.wr!=null) document.getElementById(`p${n}wr`).value=st.wr.toFixed(1);
+    if(st.hs!=null) document.getElementById(`p${n}hs`).value=st.hs.toFixed(1);
+    btn.textContent=`✓ ${st.maps} maps`;
+  }catch(e){ btn.textContent="⟳ Pull stats"; alert(e.message); }
+  btn.disabled=false;
+}
+function viewTeams(){
+  const rows = seededTeams().map((t,i)=>`<tr>
+    <td><span class="pill seed">#${i+1}</span></td><td><b>${esc(t.name)}</b></td>
+    <td>${esc(t.p1.name)} <span class="tag">(${esc(t.p1.rank)})</span> ${trackerLink(t.p1.riot)}</td>
+    <td>${esc(t.p2.name)} <span class="tag">(${esc(t.p2.rank)})</span> ${trackerLink(t.p2.riot)}</td>
+    <td>${pScore(t.p1).toFixed(1)} / ${pScore(t.p2).toFixed(1)}</td>
+    <td><b>${tScore(t).toFixed(1)}</b></td>
+    <td><button class="btn sm sec" onclick="delTeam('${esc(t.name)}')">✕</button></td></tr>`).join("");
+  return `<div class="card"><h2>Register a team</h2>
+    <div class="row"><div class="field"><label>Team name</label><input id="tn" placeholder="Team name"></div>${pFields(1)}</div>
+    <div class="row">${pFields(2)}<button class="btn" onclick="addTeam()">Add team</button></div>
+    <div class="hint">Enter the Riot ID and hit <b>⟳ Pull stats</b> to auto-fill rank, K/D, win rate and HS% from the last 10 competitive matches (needs the API key in the Data tab and public match history). Manual entry from tracker.gg still works. Seed score: 50% rank, 25% K/D (cap 2), 15% win rate, 10% HS% (cap 40).</div></div>
+    <div class="card"><h2>Seeding (${S.teams.length} teams)</h2>
+    <table><tr><th>Seed</th><th>Team</th><th>Player 1</th><th>Player 2</th><th>P scores</th><th>Team score</th><th></th></tr>${rows||"<tr><td colspan=7 class='hint'>No teams yet.</td></tr>"}</table></div>`;
+}
+function addTeam(){
+  const v=id=>document.getElementById(id).value.trim();
+  const name=v("tn"); if(!name) return alert("Team name required");
+  if(S.teams.some(t=>t.name===name)) return alert("Team name already used");
+  const p=n=>({name:v(`p${n}n`)||`P${n} of ${name}`, riot:v(`p${n}r`), rank:v(`p${n}rank`), kd:v(`p${n}kd`), wr:v(`p${n}wr`), hs:v(`p${n}hs`)});
+  S.teams.push({name,p1:p(1),p2:p(2)}); persist(); render();
+}
+function delTeam(name){ S.teams=S.teams.filter(t=>t.name!==name); persist(); render(); }
+
+let dlgMatch=null;
+function viewBracket(){
+  let html=`<div class="card"><h2>Bracket</h2>
+    <div class="row">
+    <button class="btn" onclick="genBracket('de')">Generate Double Elim (≤8 teams)</button>
+    <button class="btn sec" onclick="genBracket('se')">Generate Single Elim (≤16)</button>
+    <button class="btn sec" onclick="if(confirm('Clear bracket + results?')){S.bracket=null;persist();render()}">Reset</button></div>
+    <div class="hint">Generating locks in the current seeding. Click any match to report a score. BYEs advance automatically.</div>`;
+  const b=S.bracket;
+  if(!b){ return html+`</div>`; }
+  const last=b.matches.length-1;
+  html+=`<div class="bwrap"><div class="bracket">`;
+  b.rounds.forEach(([name,idxs])=>{
+    html+=`<div class="round"><div class="rtitle">${name}</div>`;
+    idxs.forEach(i=>{
+      const o=matchOutcome(i), r=b.results[i];
+      const slot=(t,sc,win)=>`<div class="slot ${win?'win':''}"><span class="name ${t?'':'tbd'}">${t?esc(t):"— TBD —"}</span><span class="score">${sc??""}</span></div>`;
+      html+=`<div class="match ${i===last?'champ':''}" onclick="openScore(${i})">
+        <div class="mid">M${i+1} · ${b.matches[i].r}</div>
+        ${slot(o.A, r?r.a:(o.A==="BYE"?"—":null), o.winner&&o.winner===o.A)}
+        ${slot(o.B, r?r.b:(o.B==="BYE"?"—":null), o.winner&&o.winner===o.B)}</div>`;
+    });
+    html+=`</div>`;
+  });
+  html+=`</div></div>`;
+  const pl=finalPlacements();
+  if(pl.length){ html+=`<h2 style="margin-top:14px">Placements</h2><table><tr><th>Place</th><th>Team</th><th>Season pts</th></tr>`+
+    pl.map(([p,t])=>{const pts=PLACE_PTS[parseInt(p)]??20;return `<tr class="${p==='1st'?'top3':''}"><td class="${p==='1st'?'gold':''}">${p}</td><td>${esc(t)}</td><td>${p==="5th-6th"?20:pts}</td></tr>`;}).join("")+`</table>
+    <div class="hint">If the losers-bracket team wins the Grand Final, play one bracket-reset map and report the reset score in the Grand Final match.</div>`; }
+  return html+`</div>`;
+}
+function openScore(i){
+  const o=matchOutcome(i);
+  if(!o.A||!o.B||o.A==="BYE"||o.B==="BYE") return;
+  dlgMatch=i;
+  document.getElementById("dlgTitle").textContent=`M${i+1} — report rounds won`;
+  document.getElementById("dlgA").textContent=o.A; document.getElementById("dlgB").textContent=o.B;
+  const r=S.bracket.results[i]; document.getElementById("scoreA").value=r?r.a:""; document.getElementById("scoreB").value=r?r.b:"";
+  document.getElementById("scoreDlg").showModal();
+}
+function saveScore(){
+  const a=+document.getElementById("scoreA").value, b=+document.getElementById("scoreB").value;
+  if(isNaN(a)||isNaN(b)||a===b) return alert("Enter two different scores");
+  S.bracket.results[dlgMatch]={a,b}; persist();
+  document.getElementById("scoreDlg").close(); render();
+}
+function clearScore(){ delete S.bracket.results[dlgMatch]; persist(); document.getElementById("scoreDlg").close(); render(); }
+
+function viewLog(){
+  const players=S.teams.flatMap(t=>[{n:t.p1.name,team:t.name},{n:t.p2.name,team:t.name}]);
+  const rows=S.log.map((e,i)=>`<tr><td>${esc(e.match)}</td><td>${esc(e.player)}</td><td>${esc(e.team)}</td>
+    <td>${e.k}/${e.d}/${e.a}</td><td>${e.acs}</td><td>${e.won?"W":"L"}</td>
+    <td><button class="btn sm sec" onclick="S.log.splice(${i},1);persist();render()">✕</button></td></tr>`).join("");
+  return `<div class="card"><h2>Log a map (per player)</h2>
+    <div class="row">
+    <div class="field"><label>Match</label><input id="lm" placeholder="M5" style="width:70px"></div>
+    <div class="field"><label>Player</label><select id="lp">${players.map(p=>`<option value="${esc(p.n)}|${esc(p.team)}">${esc(p.n)} (${esc(p.team)})</option>`).join("")}</select></div>
+    <div class="field"><label>Kills</label><input class="num" id="lk" type="number" value="0"></div>
+    <div class="field"><label>Deaths</label><input class="num" id="ld" type="number" value="0"></div>
+    <div class="field"><label>Assists</label><input class="num" id="la" type="number" value="0"></div>
+    <div class="field"><label>ACS</label><input class="num" id="lacs" type="number" value="200"></div>
+    <div class="field"><label>Won map?</label><select id="lw"><option value="1">Yes</option><option value="0">No</option></select></div>
+    <button class="btn" onclick="addLog()">Log</button></div>
+    <div class="hint">Copy K / D / A / ACS from the tracker.gg match page after each map.</div></div>
+    <div class="card"><h2>Season match log (${S.log.length} entries)</h2>
+    <table><tr><th>Match</th><th>Player</th><th>Team</th><th>K/D/A</th><th>ACS</th><th>Map</th><th></th></tr>${rows||"<tr><td colspan=7 class='hint'>Nothing logged yet.</td></tr>"}</table></div>`;
+}
+function addLog(){
+  const g=id=>document.getElementById(id).value;
+  const [player,team]=g("lp").split("|");
+  if(!player) return alert("Add teams first");
+  S.log.push({match:g("lm")||"M?",player,team,k:+g("lk"),d:+g("ld"),a:+g("la"),acs:+g("lacs"),won:g("lw")==="1"});
+  persist(); render();
+}
+function viewPlayers(){
+  const rows=playerAgg().map((p,i)=>`<tr class="${i<3?'top3':''}"><td class="${i===0?'gold':''}">${i+1}</td>
+    <td>${esc(p.name)}</td><td>${esc(p.team)}</td><td>${p.maps}</td><td>${p.k}/${p.d}/${p.a}</td>
+    <td>${p.kd.toFixed(2)}</td><td>${p.kda.toFixed(2)}</td><td>${p.avg.toFixed(0)}</td><td>${p.wr.toFixed(0)}%</td>
+    <td><b>${p.rating.toFixed(1)}</b></td></tr>`).join("");
+  return `<div class="card"><h2>Player leaderboard — season</h2>
+    <table><tr><th>#</th><th>Player</th><th>Team</th><th>Maps</th><th>K/D/A</th><th>K/D</th><th>KDA</th><th>Avg ACS</th><th>Map win%</th><th>Rating</th></tr>
+    ${rows||"<tr><td colspan=10 class='hint'>Log maps in the Match Log tab to populate this.</td></tr>"}</table>
+    <div class="hint">Rating (0–100) = 50% avg ACS (vs 200) + 50% KDA (cap 3.0).</div></div>`;
+}
+function viewTeamLB(){
+  const rows=S.teams.map(t=>{
+    const rec=teamRecord(t.name);
+    const plc=S.placements[t.name]||{};
+    const pts=[1,2,3].reduce((s,e)=>s+(PLACE_PTS[plc["e"+e]]||0),0);
+    return {t,rec,plc,pts};
+  }).sort((a,b)=>b.pts-a.pts||b.rec.w-a.rec.w);
+  const html=rows.map((r,i)=>`<tr class="${i<3?'top3':''}"><td class="${i===0?'gold':''}">${i+1}</td><td>${esc(r.t.name)}</td>
+    <td>${r.rec.w}–${r.rec.l}</td>
+    ${[1,2,3].map(e=>`<td><select onchange="setPlace('${esc(r.t.name)}','e${e}',this.value)">
+      <option value="">—</option>${[1,2,3,4,5,6,7,8].map(p=>`<option ${r.plc["e"+e]==p?"selected":""} value="${p}">${p}</option>`).join("")}</select></td>`).join("")}
+    <td><b>${r.pts}</b></td></tr>`).join("");
+  return `<div class="card"><h2>Team leaderboard — season</h2>
+    <table><tr><th>#</th><th>Team</th><th>Match W–L</th><th>Event 1</th><th>Event 2</th><th>Event 3</th><th>Season pts</th></tr>
+    ${html||"<tr><td colspan=7 class='hint'>Add teams first.</td></tr>"}</table>
+    <div class="hint">W–L comes from the current bracket (BYE walkovers excluded). Pick each team's final placement per event; points: 100/70/50/35/20/20/10/10. Data from the Discord bot can be imported in the Data tab.</div></div>`;
+}
+function setPlace(team,evt,val){ S.placements[team]=S.placements[team]||{}; if(val) S.placements[team][evt]=+val; else delete S.placements[team][evt]; persist(); render(); }
+
+function viewData(){
+  const s=S.settings||{};
+  const regions=["eu","na","ap","kr","latam","br"];
+  return `<div class="card"><h2>Event</h2>
+    <div class="row"><div class="field"><label>Event name</label><input id="evName" value="${esc(S.event)}" style="width:320px"></div>
+    <button class="btn" onclick="S.event=document.getElementById('evName').value;persist();render()">Save</button></div></div>
+    <div class="card"><h2>Stat API (HenrikDev)</h2>
+    <div class="row"><div class="field"><label>Region</label><select id="setRegion">${regions.map(r=>`<option ${s.region===r?"selected":""}>${r}</option>`).join("")}</select></div>
+    <div class="field"><label>API key</label><input id="setKey" type="password" value="${esc(s.apiKey)}" style="width:320px" placeholder="HDEV-..."></div>
+    <button class="btn" onclick="S.settings={region:document.getElementById('setRegion').value,apiKey:document.getElementById('setKey').value.trim()};persist();render()">Save</button></div>
+    <div class="hint">Powers the ⟳ Pull stats buttons. Get a free key at <a href="https://api.henrikdev.xyz/dashboard" target="_blank" style="color:#7fb3d5">api.henrikdev.xyz/dashboard</a> (join their Discord to generate one). The key is stored only in this browser. Players' in-game match history must be public.</div></div>
+    <div class="card"><h2>Backup & restore</h2>
+    <div class="row"><button class="btn" onclick="exportJSON()">Export data (JSON)</button>
+    <label class="btn sec" style="display:inline-block;cursor:pointer">Import JSON<input type="file" accept=".json" style="display:none" onchange="importJSON(this)"></label>
+    <button class="btn sec" onclick="if(confirm('Wipe ALL data?')){S={event:S.event,teams:[],bracket:null,log:[],placements:{},settings:S.settings};persist();render()}">Wipe all data</button></div>
+    <div class="hint">Data auto-saves in this browser. Export a JSON backup after every event. The Discord bot's /export file imports here directly (and vice versa).</div></div>`;
+}
+function exportJSON(){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:"application/json"}));
+  a.download="ffs-skirmish-data.json"; a.click();
+}
+function importJSON(inp){
+  const f=inp.files[0]; if(!f) return;
+  f.text().then(t=>{ const d=JSON.parse(t); d.settings=d.settings||S.settings; S=d; persist(); render(); }).catch(()=>alert("Invalid file"));
+}
+render();
+</script>
+</body>
+</html>
