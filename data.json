@@ -57,10 +57,29 @@
         "wr": "40.0",
         "hs": "22.8"
       }
+    },
+    {
+      "name": "Karrus",
+      "p1": {
+        "name": "Karrot",
+        "riot": "K4rr0t#Noob",
+        "rank": "Gold 2",
+        "kd": "1.84",
+        "wr": "90.0",
+        "hs": "39.5"
+      },
+      "p2": {
+        "name": "Fusfus",
+        "riot": "Edin#edon",
+        "rank": "Gold 2",
+        "kd": "1.91",
+        "wr": "60.0",
+        "hs": "25.9"
+      }
     }
   ],
   "bracket": null,
   "log": [],
   "placements": {},
-  "updatedAt": 1783772279089
+  "updatedAt": 1783772369364
 }
