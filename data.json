@@ -78,8 +78,68 @@
       }
     }
   ],
-  "bracket": null,
+  "bracket": {
+    "type": "se",
+    "size": 4,
+    "slots": [
+      "Tea Slurpers",
+      "Karrus",
+      "SOUL PIRATES",
+      "BakuDeku Slimes"
+    ],
+    "results": {},
+    "matches": [
+      {
+        "a": [
+          "seed",
+          1
+        ],
+        "b": [
+          "seed",
+          4
+        ],
+        "r": "Semifinals"
+      },
+      {
+        "a": [
+          "seed",
+          2
+        ],
+        "b": [
+          "seed",
+          3
+        ],
+        "r": "Semifinals"
+      },
+      {
+        "a": [
+          "w",
+          0
+        ],
+        "b": [
+          "w",
+          1
+        ],
+        "r": "Final"
+      }
+    ],
+    "rounds": [
+      [
+        "Semifinals",
+        [
+          0,
+          1
+        ]
+      ],
+      [
+        "Final",
+        [
+          2
+        ]
+      ]
+    ]
+  },
   "log": [],
   "placements": {},
-  "updatedAt": 1783762194989
+  "updatedAt": 1783772125130
 }
