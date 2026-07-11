@@ -19,10 +19,67 @@
         "wr": "40.0",
         "hs": "34.0"
       }
+    },
+    {
+      "name": "SOUL PIRATES",
+      "p1": {
+        "name": "Nyami",
+        "riot": "nyami#000",
+        "rank": "Gold 1",
+        "kd": "0.69",
+        "wr": "70.0",
+        "hs": "25.2"
+      },
+      "p2": {
+        "name": "Rocky",
+        "riot": "Blaziken#BKick",
+        "rank": "Diamond 1",
+        "kd": "1.05",
+        "wr": "50.0",
+        "hs": "39.3"
+      }
+    },
+    {
+      "name": "BakuDeku Slimes",
+      "p1": {
+        "name": "Croto",
+        "riot": "Croto#noir",
+        "rank": "Silver 3",
+        "kd": "1.00",
+        "wr": "50",
+        "hs": "20"
+      },
+      "p2": {
+        "name": "ImHim4804",
+        "riot": "Rocopops#8877",
+        "rank": "Gold 1",
+        "kd": "0.73",
+        "wr": "40.0",
+        "hs": "22.8"
+      }
+    },
+    {
+      "name": "Karrus",
+      "p1": {
+        "name": "K4rrot",
+        "riot": "K4rr0t#Noob",
+        "rank": "Gold 2",
+        "kd": "1.84",
+        "wr": "90.0",
+        "hs": "39.5"
+      },
+      "p2": {
+        "name": "FusFus",
+        "riot": "edin#edon",
+        "rank": "Iron 1",
+        "kd": "1.91",
+        "wr": "60.0",
+        "hs": "25.9"
+      }
     }
   ],
   "bracket": null,
   "log": [],
   "placements": {},
-  "updatedAt": 1783759420029
+  "updatedAt": 1783760919634
 }
