@@ -79,7 +79,7 @@
     }
   ],
   "bracket": {
-    "type": "se",
+    "type": "de",
     "size": 4,
     "slots": [
       "Tea Slurpers",
@@ -98,7 +98,7 @@
           "seed",
           4
         ],
-        "r": "Semifinals"
+        "r": "Semifinal 1"
       },
       {
         "a": [
@@ -109,7 +109,7 @@
           "seed",
           3
         ],
-        "r": "Semifinals"
+        "r": "Semifinal 2"
       },
       {
         "a": [
@@ -120,7 +120,40 @@
           "w",
           1
         ],
-        "r": "Final"
+        "r": "Upper Final"
+      },
+      {
+        "a": [
+          "l",
+          0
+        ],
+        "b": [
+          "l",
+          1
+        ],
+        "r": "Lower Round 1"
+      },
+      {
+        "a": [
+          "w",
+          3
+        ],
+        "b": [
+          "l",
+          2
+        ],
+        "r": "Lower Final"
+      },
+      {
+        "a": [
+          "w",
+          2
+        ],
+        "b": [
+          "w",
+          4
+        ],
+        "r": "Grand Final"
       }
     ],
     "rounds": [
@@ -132,14 +165,32 @@
         ]
       ],
       [
-        "Final",
+        "Upper Final",
         [
           2
+        ]
+      ],
+      [
+        "Lower Round 1",
+        [
+          3
+        ]
+      ],
+      [
+        "Lower Final",
+        [
+          4
+        ]
+      ],
+      [
+        "Grand Final",
+        [
+          5
         ]
       ]
     ]
   },
   "log": [],
   "placements": {},
-  "updatedAt": 1783772125130
+  "updatedAt": 1783772131015
 }
