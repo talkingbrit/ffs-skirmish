@@ -111,7 +111,19 @@ footer{border-top:1px solid var(--line);padding:18px 24px;text-align:center;colo
 footer .orglink{color:var(--faint);cursor:pointer}
 footer .orglink:hover{color:var(--muted);text-decoration:none}
 .admin-note{background:rgba(227,179,65,.07);border:1px solid rgba(227,179,65,.25);border-radius:9px;padding:10px 14px;font-size:12.5px;color:var(--muted);margin-bottom:16px}
-@media(max-width:700px){.topbar-inner,.nav-inner,main{padding-left:14px;padding-right:14px}.eventname{display:none}}
+/* player profile + sorting */
+.pname{cursor:pointer;border-bottom:1px dotted var(--faint)}
+.pname:hover{color:#8ab4d8;border-bottom-color:#8ab4d8}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:var(--text)}
+th.sortable.on{color:var(--text)}
+.statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:6px}
+.stat{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.stat .lbl{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--faint);margin-bottom:3px}
+.stat .val{font-size:16px;font-weight:700}
+.mid a{color:var(--faint);font-size:10px}
+.mid a:hover{color:#8ab4d8}
+@media(max-width:700px){.topbar-inner,.nav-inner,main{padding-left:14px;padding-right:14px}.eventname{display:none}.statgrid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -132,9 +144,16 @@ footer .orglink:hover{color:var(--muted);text-decoration:none}
   <h3 id="dlgTitle">Report score</h3>
   <div class="row"><div class="field"><label id="dlgA">Team A</label><input class="num" id="scoreA" type="number" min="0"></div>
   <div class="field"><label id="dlgB">Team B</label><input class="num" id="scoreB" type="number" min="0"></div></div>
+  <div class="row"><div class="field"><label>Tracker match link (optional)</label><input id="scoreLink" placeholder="https://tracker.gg/valorant/match/…" style="width:330px"></div></div>
   <div class="row" style="margin-bottom:0"><button class="btn" onclick="saveScore()">Save</button>
   <button class="btn ghost" onclick="clearScore()">Clear result</button>
   <button class="btn ghost" onclick="document.getElementById('scoreDlg').close()">Cancel</button></div>
+</dialog>
+
+<dialog id="playerDlg" style="min-width:420px">
+  <h3 id="pdName">Player</h3>
+  <div id="pdBody"></div>
+  <div class="row" style="margin:16px 0 0"><button class="btn ghost" onclick="document.getElementById('playerDlg').close()">Close</button></div>
 </dialog>
 
 <script>
@@ -204,8 +223,8 @@ function pScore(p){
   const rank = (RANKS.indexOf(p.rank)+1)/25*100*0.5;
   const kd = Math.min(+p.kd||0,2)/2*100*0.25;
   const wr = (+p.wr||0)*0.15;
-  const hs = Math.min(+p.hs||0,40)/40*100*0.10;
-  return rank+kd+wr+hs;
+  const acs = Math.min(+p.acs||200,300)/300*100*0.10;
+  return rank+kd+wr+acs;
 }
 function tScore(t){ return (pScore(t.p1)+pScore(t.p2))/2; }
 function seededTeams(){ return [...S.teams].sort((a,b)=>tScore(b)-tScore(a)); }
@@ -299,13 +318,42 @@ function teamRecord(name){
 function playerAgg(){
   const agg={};
   S.log.forEach(e=>{
-    const k=e.player; agg[k]=agg[k]||{team:e.team,maps:0,k:0,d:0,a:0,acs:0,w:0};
-    const p=agg[k]; p.maps++; p.k+=+e.k; p.d+=+e.d; p.a+=+e.a; p.acs+=+e.acs; p.w+=e.won?1:0; p.team=e.team;
+    const k=e.player; agg[k]=agg[k]||{team:e.team,maps:0,k:0,d:0,a:0,acs:0,w:0,fk:0,fd:0};
+    const p=agg[k]; p.maps++; p.k+=+e.k; p.d+=+e.d; p.a+=+e.a; p.acs+=+e.acs; p.w+=e.won?1:0;
+    p.fk+=+e.fk||0; p.fd+=+e.fd||0; p.team=e.team;
   });
   return Object.entries(agg).map(([name,p])=>{
     const kd=p.k/Math.max(p.d,1), kda=(p.k+p.a/2)/Math.max(p.d,1), avg=p.acs/p.maps;
     return {name,...p,kd,kda,avg,wr:p.w/p.maps*100,rating:avg/200*50+Math.min(kda,3)/3*50};
   }).sort((a,b)=>b.rating-a.rating);
+}
+function riotOf(name){
+  for(const t of S.teams){ if(t.p1.name===name) return t.p1; if(t.p2.name===name) return t.p2; }
+  return null;
+}
+/* ---------- player profile modal (live last-10 stats) ---------- */
+const pdCache={};
+function stat(l,v){ return `<div class="stat"><div class="lbl">${l}</div><div class="val">${esc(String(v))}</div></div>`; }
+async function showPlayer(name){
+  const p=riotOf(name);
+  const dlg=document.getElementById("playerDlg"), body=document.getElementById("pdBody");
+  document.getElementById("pdName").textContent = name + (p&&p.riot?"  ·  "+p.riot:"");
+  const seedLine = p?`<div class="hint" style="margin-top:12px">Individual seed score: <b>${pScore(p).toFixed(1)}</b> — 50% rank · 25% K/D · 15% win rate · 10% ACS${p.riot?` · ${trackerLink(p.riot)}`:""}</div>`:"";
+  dlg.showModal();
+  if(!p||!p.riot){ body.innerHTML=`<div class="hint">No Riot ID on file for this player.</div>`+seedLine; return; }
+  body.innerHTML=`<div class="hint">Loading last 10 competitive matches…</div>`;
+  try{
+    const st = pdCache[p.riot] || (pdCache[p.riot] = await pullPlayer(p.riot));
+    const f=(v,d=1)=>v==null?"—":(+v).toFixed(d);
+    body.innerHTML=`<div class="statgrid">
+      ${stat("Rank", st.rank||"Unranked")}
+      ${stat("K/D", f(st.kd,2))}
+      ${stat("Win rate", f(st.wr)+"%")}
+      ${stat("Headshot %", f(st.hs)+"%")}
+      ${stat("Avg ACS", f(st.acs,0))}
+      ${stat("Sample", st.maps+" maps")}
+    </div>`+seedLine;
+  }catch(e){ delete pdCache[p.riot]; body.innerHTML=`<div class="hint">Couldn't load live stats: ${esc(e.message)}</div>`+seedLine; }
 }
 
 /* ---------- HenrikDev API stat pull ---------- */
@@ -325,19 +373,21 @@ async function pullPlayer(riot){
   const mmr=await apiGet(`/valorant/v2/mmr/${reg}/${name}/${tag}`);
   const rank=(mmr&&mmr.current_data&&mmr.current_data.currenttierpatched)||"";
   const ms=await apiGet(`/valorant/v3/matches/${reg}/${name}/${tag}?filter=competitive&size=10`);
-  let k=0,d=0,h=0,b=0,l=0,w=0,n=0;
+  let k=0,d=0,h=0,b=0,l=0,w=0,n=0,sc=0,rounds=0;
   (ms||[]).forEach(m=>{
     const ps=(m.players&&(m.players.all_players||[]))||[];
     const me=ps.find(p=>(p.name+"#"+p.tag).toLowerCase()===riot.toLowerCase());
     if(!me||!me.stats) return;
     k+=me.stats.kills||0; d+=me.stats.deaths||0;
     h+=me.stats.headshots||0; b+=me.stats.bodyshots||0; l+=me.stats.legshots||0;
+    sc+=me.stats.score||0;
+    rounds+=(m.metadata&&m.metadata.rounds_played)||0;
     const team=(me.team||"").toLowerCase();
     if(m.teams&&m.teams[team]&&m.teams[team].has_won) w++;
     n++;
   });
   if(!n&&!rank) throw new Error("No competitive data found — is the match history public?");
-  return { rank, kd:n?k/Math.max(d,1):null, wr:n?w/n*100:null, hs:(h+b+l)?h/(h+b+l)*100:null, maps:n };
+  return { rank, kd:n?k/Math.max(d,1):null, wr:n?w/n*100:null, hs:(h+b+l)?h/(h+b+l)*100:null, acs:rounds?sc/rounds:null, maps:n };
 }
 async function fetchStats(n){
   const btn=document.getElementById(`p${n}fetch`);
@@ -349,7 +399,7 @@ async function fetchStats(n){
     if(st.rank&&RANKS.includes(st.rank)) document.getElementById(`p${n}rank`).value=st.rank;
     if(st.kd!=null) document.getElementById(`p${n}kd`).value=st.kd.toFixed(2);
     if(st.wr!=null) document.getElementById(`p${n}wr`).value=st.wr.toFixed(1);
-    if(st.hs!=null) document.getElementById(`p${n}hs`).value=st.hs.toFixed(1);
+    if(st.acs!=null) document.getElementById(`p${n}acs`).value=st.acs.toFixed(0);
     btn.textContent=`Done (${st.maps} maps)`;
   }catch(e){ btn.textContent="Pull stats"; alert(e.message); }
   btn.disabled=false;
@@ -414,7 +464,7 @@ function viewBracket(){
       const o=matchOutcome(i), r=b.results[i];
       const slot=(t,sc,win)=>`<div class="slot ${win?'win':''}"><span class="name ${t?(t==="BYE"?"bye":""):"tbd"}">${t?esc(t):"To be decided"}</span><span class="score">${sc??""}</span></div>`;
       html+=`<div class="match ${i===last?'final':''} ${admin?'clickable':''}" ${admin?`onclick="openScore(${i})"`:""}>
-        <div class="mid">Match ${i+1}</div>
+        <div class="mid">Match ${i+1}${r&&r.link?` · <a href="${esc(r.link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">match page ↗</a>`:""}</div>
         ${slot(o.A, r?r.a:(o.A==="BYE"?"–":null), o.winner&&o.winner===o.A)}
         ${slot(o.B, r?r.b:(o.B==="BYE"?"–":null), o.winner&&o.winner===o.B)}</div>`;
     });
@@ -437,12 +487,15 @@ function openScore(i){
   document.getElementById("dlgTitle").textContent=`Match ${i+1} — rounds won`;
   document.getElementById("dlgA").textContent=o.A; document.getElementById("dlgB").textContent=o.B;
   const r=S.bracket.results[i]; document.getElementById("scoreA").value=r?r.a:""; document.getElementById("scoreB").value=r?r.b:"";
+  document.getElementById("scoreLink").value=(r&&r.link)||"";
   document.getElementById("scoreDlg").showModal();
 }
 function saveScore(){
   const a=+document.getElementById("scoreA").value, b=+document.getElementById("scoreB").value;
   if(isNaN(a)||isNaN(b)||a===b) return alert("Enter two different scores");
-  S.bracket.results[dlgMatch]={a,b}; persist();
+  const link=document.getElementById("scoreLink").value.trim();
+  const res={a,b}; if(link) res.link=link;
+  S.bracket.results[dlgMatch]=res; persist();
   document.getElementById("scoreDlg").close(); render();
 }
 function clearScore(){ delete S.bracket.results[dlgMatch]; persist(); document.getElementById("scoreDlg").close(); render(); }
@@ -455,7 +508,7 @@ function pFields(n){
   <div class="field"><label>Rank</label><select id="p${n}rank">${RANKS.map(r=>`<option>${r}</option>`).join("")}</select></div>
   <div class="field"><label>K/D</label><input class="num" id="p${n}kd" type="number" step="0.01" value="1.00"></div>
   <div class="field"><label>Win %</label><input class="num" id="p${n}wr" type="number" step="0.1" value="50"></div>
-  <div class="field"><label>HS %</label><input class="num" id="p${n}hs" type="number" step="0.1" value="20"></div>`;
+  <div class="field"><label>Avg ACS</label><input class="num" id="p${n}acs" type="number" step="1" value="200"></div>`;
 }
 function viewTeams(){
   let html="";
@@ -464,21 +517,21 @@ function viewTeams(){
       <div class="card">
       <div class="row"><div class="field"><label>Team name</label><input id="tn" placeholder="Team name"></div>${pFields(1)}</div>
       <div class="row">${pFields(2)}<button class="btn" onclick="addTeam()">Add team</button></div>
-      <div class="hint">Enter each Riot ID and use “Pull stats” to fill rank, K/D, win rate and headshot % automatically from the last 10 competitive matches (requires the stats API key in Settings and a public match history). Values can also be entered manually from tracker.gg.</div>
+      <div class="hint">Enter each Riot ID and use “Pull stats” to fill rank, K/D, win rate and average combat score automatically from the last 10 competitive matches (requires a public match history). Values can also be entered manually from tracker.gg.</div>
       </div></div>`;
   }
   const rows = seededTeams().map((t,i)=>`<tr class="${i===0?'rank1':''}">
     <td><span class="seedchip ${i<2?'top':''}">${i+1}</span></td>
     <td><b>${esc(t.name)}</b></td>
-    <td>${esc(t.p1.name)} <span class="sub">${esc(t.p1.rank)}</span> ${trackerLink(t.p1.riot)}</td>
-    <td>${esc(t.p2.name)} <span class="sub">${esc(t.p2.rank)}</span> ${trackerLink(t.p2.riot)}</td>
+    <td><span class="pname" onclick="showPlayer('${esc(t.p1.name)}')">${esc(t.p1.name)}</span> <span class="sub">${esc(t.p1.rank)} · ${pScore(t.p1).toFixed(1)}</span></td>
+    <td><span class="pname" onclick="showPlayer('${esc(t.p2.name)}')">${esc(t.p2.name)}</span> <span class="sub">${esc(t.p2.rank)} · ${pScore(t.p2).toFixed(1)}</span></td>
     <td class="r">${tScore(t).toFixed(1)}</td>
     ${admin?`<td class="r"><button class="btn sm ghost" onclick="delTeam('${esc(t.name)}')">Remove</button></td>`:""}</tr>`).join("");
   html+=`<div class="sec">${secHead("Teams & seeding", S.teams.length+" registered")}
     <div class="card" style="padding:8px 16px 12px">
     <table><thead><tr><th>Seed</th><th>Team</th><th>Player 1</th><th>Player 2</th><th class="r">Seed score</th>${admin?"<th></th>":""}</tr></thead>
     <tbody>${rows||`<tr><td colspan="${admin?6:5}"><div class="empty"><b>No teams yet</b>Registration opens on Discord — teams appear here once signed up.</div></td></tr>`}</tbody></table>
-    <div class="hint">Seeding is calculated from current rank (50%), K/D (25%), win rate (15%) and headshot rate (10%), averaged across both players.</div>
+    <div class="hint">Seeding is calculated from current rank (50%), K/D (25%), win rate (15%) and average combat score (10%), averaged across both players — each player's individual score is shown next to their rank. Click a player's name for their live profile from the last 10 competitive matches.</div>
     </div></div>`;
   return html;
 }
@@ -486,23 +539,28 @@ function addTeam(){
   const v=id=>document.getElementById(id).value.trim();
   const name=v("tn"); if(!name) return alert("Team name required");
   if(S.teams.some(t=>t.name===name)) return alert("Team name already used");
-  const p=n=>({name:v(`p${n}n`)||`Player ${n}`, riot:v(`p${n}r`), rank:v(`p${n}rank`), kd:v(`p${n}kd`), wr:v(`p${n}wr`), hs:v(`p${n}hs`)});
+  const p=n=>({name:v(`p${n}n`)||`Player ${n}`, riot:v(`p${n}r`), rank:v(`p${n}rank`), kd:v(`p${n}kd`), wr:v(`p${n}wr`), acs:v(`p${n}acs`)});
   S.teams.push({name,p1:p(1),p2:p(2)}); persist(); render();
 }
 function delTeam(name){ if(!admin) return; if(!confirm(`Remove ${name}?`)) return; S.teams=S.teams.filter(t=>t.name!==name); persist(); render(); }
 
 /* ----- players ----- */
+let plSort={key:"rating",dir:-1};
+function setPlSort(k){ if(plSort.key===k) plSort.dir*=-1; else plSort={key:k,dir:-1}; render(); }
 function viewPlayers(){
-  const rows=playerAgg().map((p,i)=>`<tr class="${i===0?'rank1':''}">
-    <td>${i+1}</td><td><b>${esc(p.name)}</b> <span class="sub">${esc(p.team)}</span></td>
+  const data=playerAgg().sort((x,y)=>((y[plSort.key]??0)-(x[plSort.key]??0))*(-plSort.dir));
+  const H=(k,label)=>`<th class="r sortable ${plSort.key===k?'on':''}" onclick="setPlSort('${k}')" title="Click to sort">${label}${plSort.key===k?(plSort.dir<0?" ▾":" ▴"):""}</th>`;
+  const rows=data.map((p,i)=>`<tr class="${i===0&&plSort.key==='rating'&&plSort.dir<0?'rank1':''}">
+    <td>${i+1}</td><td><span class="pname" onclick="showPlayer('${esc(p.name)}')"><b>${esc(p.name)}</b></span> <span class="sub">${esc(p.team)}</span></td>
     <td class="r">${p.maps}</td><td class="r">${p.k} / ${p.d} / ${p.a}</td>
+    <td class="r">${p.fk}</td><td class="r">${p.fd}</td>
     <td class="r">${p.kd.toFixed(2)}</td><td class="r">${p.avg.toFixed(0)}</td>
     <td class="r">${p.wr.toFixed(0)}%</td><td class="r"><b>${p.rating.toFixed(1)}</b></td></tr>`).join("");
   return `<div class="sec">${secHead("Player leaderboard","season "+new Date().getFullYear())}
     <div class="card" style="padding:8px 16px 12px">
-    <table><thead><tr><th>#</th><th>Player</th><th class="r">Maps</th><th class="r">K / D / A</th><th class="r">K/D</th><th class="r">Avg ACS</th><th class="r">Win %</th><th class="r">Rating</th></tr></thead>
-    <tbody>${rows||`<tr><td colspan="8"><div class="empty"><b>No maps played yet</b>Player stats appear here as matches are logged during events.</div></td></tr>`}</tbody></table>
-    <div class="hint">Rating combines average combat score (50%) and KDA (50%), scaled 0–100. Minimum 3 maps to hold a rank at season end.</div>
+    <table><thead><tr><th>#</th><th>Player</th>${H("maps","Maps")}${H("k","K / D / A")}${H("fk","FK")}${H("fd","FD")}${H("kd","K/D")}${H("avg","Avg ACS")}${H("wr","Win %")}${H("rating","Rating")}</tr></thead>
+    <tbody>${rows||`<tr><td colspan="10"><div class="empty"><b>No maps played yet</b>Player stats appear here as matches are logged during events.</div></td></tr>`}</tbody></table>
+    <div class="hint">Click any column header to sort (click again to flip). Click a player's name for their live profile. FK/FD = first kills / first deaths. Rating combines average combat score (50%) and KDA (50%), scaled 0–100; minimum 3 maps to hold a rank at season end.</div>
     </div></div>`;
 }
 
@@ -546,13 +604,13 @@ function setEntryMatch(v){ entryMatch=+v; render(); }
 function viewEntry(){
   const rows=S.log.slice().reverse().map((e,ri)=>{ const i=S.log.length-1-ri; return `<tr>
     <td>${esc(e.match)}</td><td><b>${esc(e.player)}</b> <span class="sub">${esc(e.team)}</span></td>
-    <td class="r">${e.k} / ${e.d} / ${e.a}</td><td class="r">${e.acs}</td>
+    <td class="r">${e.k} / ${e.d} / ${e.a}</td><td class="r">${e.fk??0} / ${e.fd??0}</td><td class="r">${e.acs}</td>
     <td class="r">${e.won?'<span class="wl-w">Won</span>':'<span class="wl-l">Lost</span>'}</td>
     <td class="r"><button class="btn sm ghost" onclick="S.log.splice(${i},1);persist();render()">Delete</button></td></tr>`; }).join("");
   const logSec=`<div class="sec">${secHead("Season match log", S.log.length+" entries")}
     <div class="card" style="padding:8px 16px 12px">
-    <table><thead><tr><th>Match</th><th>Player</th><th class="r">K / D / A</th><th class="r">ACS</th><th class="r">Result</th><th></th></tr></thead>
-    <tbody>${rows||`<tr><td colspan="6"><div class="empty"><b>Nothing logged yet</b></div></td></tr>`}</tbody></table></div></div>`;
+    <table><thead><tr><th>Match</th><th>Player</th><th class="r">K / D / A</th><th class="r">FK / FD</th><th class="r">ACS</th><th class="r">Result</th><th></th></tr></thead>
+    <tbody>${rows||`<tr><td colspan="7"><div class="empty"><b>Nothing logged yet</b></div></td></tr>`}</tbody></table></div></div>`;
 
   const ready=readyMatches();
   if(!ready.length){
@@ -568,7 +626,9 @@ function viewEntry(){
     <td class="r"><input class="num" id="st${idx}k" type="number" value="0"></td>
     <td class="r"><input class="num" id="st${idx}d" type="number" value="0"></td>
     <td class="r"><input class="num" id="st${idx}a" type="number" value="0"></td>
-    <td class="r"><input class="num" id="st${idx}acs" type="number" value="200"></td></tr>`).join("");
+    <td class="r"><input class="num" id="st${idx}acs" type="number" value="200"></td>
+    <td class="r"><input class="num" id="st${idx}fk" type="number" value="0"></td>
+    <td class="r"><input class="num" id="st${idx}fd" type="number" value="0"></td></tr>`).join("");
   const defWinner=o.winner&&o.winner!=="BYE"?o.winner:o.A;
   return `<div class="sec">${secHead("Log a map","stats for every player in one go")}
     <div class="card">
@@ -579,7 +639,7 @@ function viewEntry(){
       <option ${defWinner===o.A?"selected":""}>${esc(o.A)}</option>
       <option ${defWinner===o.B?"selected":""}>${esc(o.B)}</option></select></div>
     </div>
-    <table style="max-width:640px"><thead><tr><th>Player</th><th class="r">Kills</th><th class="r">Deaths</th><th class="r">Assists</th><th class="r">ACS</th></tr></thead>
+    <table style="max-width:820px"><thead><tr><th>Player</th><th class="r">Kills</th><th class="r">Deaths</th><th class="r">Assists</th><th class="r">ACS</th><th class="r">First kills</th><th class="r">First deaths</th></tr></thead>
     <tbody>${statRows}</tbody></table>
     <div class="row" style="margin:14px 0 0"><button class="btn" onclick="addMapLog()">Log all 4 players</button></div>
     <div class="hint">Players come straight from the selected bracket match. Copy each player's kills, deaths, assists and ACS from the tracker.gg match page. The winner is pre-filled from the reported score. Entries feed the public player leaderboard.</div>
@@ -595,6 +655,8 @@ function addMapLog(){
     d:+document.getElementById(`st${idx}d`).value||0,
     a:+document.getElementById(`st${idx}a`).value||0,
     acs:+document.getElementById(`st${idx}acs`).value||0,
+    fk:+document.getElementById(`st${idx}fk`).value||0,
+    fd:+document.getElementById(`st${idx}fd`).value||0,
     won:r.team===winner
   }));
   if(entries.every(e=>!e.k&&!e.d&&!e.a)) return alert("Enter some stats first — everything is zero.");
