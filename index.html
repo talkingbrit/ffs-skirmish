@@ -79,16 +79,55 @@ dialog::backdrop{background:rgba(0,0,0,.7)}
 const RANKS = (() => { const out = []; ["Iron","Bronze","Silver","Gold","Platinum","Diamond","Ascendant","Immortal"].forEach(t => [1,2,3].forEach(d => out.push(t+" "+d))); out.push("Radiant"); return out; })();
 const PLACE_PTS = {1:100, 2:70, 3:50, 4:35, 5:20, 6:20, 7:10, 8:10};
 
-let S = { event:"FFS Skirmish Series — Event 1", teams:[], bracket:null, log:[], placements:{}, settings:{region:"eu", apiKey:""} };
-function persist(){ try{ localStorage.setItem("ffsSkirmishS1", JSON.stringify(S)); }catch(e){} }
-function restore(){ try{ const d = localStorage.getItem("ffsSkirmishS1"); if(d) S = Object.assign(S, JSON.parse(d)); S.settings = S.settings||{region:"eu",apiKey:""}; }catch(e){} }
+const DEF_SETTINGS = {region:"eu", apiKey:"", ghRepo:"talkingbrit/ffs-skirmish", ghToken:""};
+let S = { event:"FFS Skirmish Series — Event 1", teams:[], bracket:null, log:[], placements:{}, settings:{...DEF_SETTINGS} };
+function persist(){ try{ S.updatedAt=Date.now(); localStorage.setItem("ffsSkirmishS1", JSON.stringify(S)); }catch(e){} queuePublish(); }
+function restore(){ try{ const d = localStorage.getItem("ffsSkirmishS1"); if(d) S = Object.assign(S, JSON.parse(d)); }catch(e){} S.settings = Object.assign({...DEF_SETTINGS}, S.settings||{}); }
 restore();
-/* On GitHub Pages: auto-load published data.json for visitors with no local data */
-(async()=>{ try{
-  const r=await fetch("data.json",{cache:"no-store"});
-  if(r.ok){ const d=await r.json();
-    if(!S.teams.length&&!S.log.length){ const keep=S.settings; S=d; S.settings=(d.settings&&d.settings.apiKey)?d.settings:keep; render(); } }
-}catch(e){} })();
+
+/* ---------- live shared data (GitHub as backend) ---------- */
+async function fetchPublished(){
+  const repo=(S.settings&&S.settings.ghRepo)||"";
+  if(repo){ try{
+    const r=await fetch(`https://api.github.com/repos/${repo}/contents/data.json`,{headers:{Accept:"application/vnd.github.raw+json"},cache:"no-store"});
+    if(r.ok) return await r.json();
+  }catch(e){} }
+  try{ const r=await fetch("data.json",{cache:"no-store"}); if(r.ok) return await r.json(); }catch(e){}
+  return null;
+}
+(async()=>{ const d=await fetchPublished();
+  const localStamp = S.updatedAt || ((S.teams.length||S.log.length) ? Infinity : 0);
+  if(d && (d.updatedAt||1) > localStamp){
+    const keep=S.settings; S=d; S.settings=Object.assign({...DEF_SETTINGS}, keep, (d.settings&&d.settings.apiKey)?d.settings:{});
+    try{ localStorage.setItem("ffsSkirmishS1", JSON.stringify(S)); }catch(e){}
+    render();
+  }
+})();
+let pubTimer=null, pubState="";
+function queuePublish(){
+  const s=S.settings||{};
+  if(!s.ghToken||!s.ghRepo) return;
+  clearTimeout(pubTimer); pubState="pending";
+  pubTimer=setTimeout(()=>publishSite(true), 3000);
+}
+async function publishSite(silent){
+  const s=S.settings||{};
+  if(!s.ghRepo||!s.ghToken) return alert("Set the GitHub repo and token in the Data tab first.");
+  const pub={...S}; delete pub.settings; pub.updatedAt=S.updatedAt||Date.now();
+  const url=`https://api.github.com/repos/${s.ghRepo}/contents/data.json`;
+  const hdr={Authorization:"Bearer "+s.ghToken, Accept:"application/vnd.github+json"};
+  try{
+    let sha;
+    const g=await fetch(url,{headers:hdr,cache:"no-store"});
+    if(g.ok){ sha=(await g.json()).sha; }
+    const body={message:"Update tournament data", content:btoa(unescape(encodeURIComponent(JSON.stringify(pub,null,2))))};
+    if(sha) body.sha=sha;
+    const p=await fetch(url,{method:"PUT",headers:hdr,body:JSON.stringify(body)});
+    if(!p.ok) throw new Error("GitHub API "+p.status+(p.status===401||p.status===403?" — check the token":""));
+    pubState="ok";
+    if(!silent) alert("Published — everyone now sees the current data.");
+  }catch(e){ pubState="fail"; if(!silent) alert("Publish failed: "+e.message); else console.warn("Auto-publish failed:",e.message); }
+}
 
 /* ---------- seeding ---------- */
 function pScore(p){
@@ -412,8 +451,14 @@ function viewData(){
     <div class="card"><h2>Stat API (HenrikDev)</h2>
     <div class="row"><div class="field"><label>Region</label><select id="setRegion">${regions.map(r=>`<option ${s.region===r?"selected":""}>${r}</option>`).join("")}</select></div>
     <div class="field"><label>API key</label><input id="setKey" type="password" value="${esc(s.apiKey)}" style="width:320px" placeholder="HDEV-..."></div>
-    <button class="btn" onclick="S.settings={region:document.getElementById('setRegion').value,apiKey:document.getElementById('setKey').value.trim()};persist();render()">Save</button></div>
+    <button class="btn" onclick="Object.assign(S.settings,{region:document.getElementById('setRegion').value,apiKey:document.getElementById('setKey').value.trim()});persist();render()">Save</button></div>
     <div class="hint">Powers the ⟳ Pull stats buttons. Get a free key at <a href="https://api.henrikdev.xyz/dashboard" target="_blank" style="color:#7fb3d5">api.henrikdev.xyz/dashboard</a> (join their Discord to generate one). The key is stored only in this browser. Players' in-game match history must be public.</div></div>
+    <div class="card"><h2>Live publishing (GitHub Pages)</h2>
+    <div class="row"><div class="field"><label>Repo (user/name)</label><input id="setRepo" value="${esc(s.ghRepo||"")}" style="width:240px" placeholder="talkingbrit/ffs-skirmish"></div>
+    <div class="field"><label>GitHub token</label><input id="setGhTok" type="password" value="${esc(s.ghToken||"")}" style="width:280px" placeholder="github_pat_..."></div>
+    <button class="btn" onclick="S.settings.ghRepo=document.getElementById('setRepo').value.trim();S.settings.ghToken=document.getElementById('setGhTok').value.trim();persist();render()">Save</button>
+    <button class="btn sec" onclick="publishSite(false)">Publish now</button></div>
+    <div class="hint">With a token saved, <b>every change auto-publishes</b> to the live site a few seconds later — teams, scores and leaderboards update for everyone. Create the token at github.com → Settings → Developer settings → <b>Fine-grained personal access tokens</b>: Repository access = only this repo; Permissions = Contents: Read and write. The token stays in this browser and is never included in the published data.</div></div>
     <div class="card"><h2>Backup & restore</h2>
     <div class="row"><button class="btn" onclick="exportJSON()">Export data (JSON)</button>
     <label class="btn sec" style="display:inline-block;cursor:pointer">Import JSON<input type="file" accept=".json" style="display:none" onchange="importJSON(this)"></label>
